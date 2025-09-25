@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Form Evaluasi Kinerja</title>
   <script src="https://cdn.tailwindcss.com"></script>
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <style>
@@ -33,18 +34,31 @@
       background: #fff;
       cursor: pointer;
     }
-    .rating-oval input[type="radio"] {
-      display: none;
-    }
+    .rating-oval input[type="radio"] { display: none; }
     .rating-oval input[type="radio"]:checked + span {
       background-color: #2563eb;
       color: white;
       border-radius: 50%;
       display: flex;
-      width: 100%;
-      height: 100%;
-      align-items: center;
-      justify-content: center;
+      width: 100%; height: 100%;
+      align-items: center; justify-content: center;
+    }
+    #fixedSubmitBtn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #2563eb;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 9999px;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 100;
+      display: none;
+    }
+    #fixedSubmitBtn:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -75,31 +89,25 @@
 
       <div>
         <label class="block font-semibold">Departemen</label>
-        <select id="department" name="department" class="mt-1 block w-full px-3 py-2 border rounded-md bg-gray-100" required disabled>
-          <option value="">Pilih Departemen</option>
-        </select>
+        <input id="department" name="department" type="text"
+               class="mt-1 block w-full px-3 py-2 border rounded-md bg-gray-100 text-black" readonly>
       </div>
+
+      <div id="loadingMsg" class="hidden text-center text-blue-600 font-semibold">Loading data...</div>
 
       <div id="employeeNameContainer" class="mt-4 hidden">
         <label class="block font-semibold">Nama Karyawan</label>
-        <input id="employeeNameBox" type="text" class="mt-1 block w-full px-3 py-2 border rounded-md bg-gray-100" readonly>
+        <input id="employeeNameBox" type="text"
+               class="mt-1 block w-full px-3 py-2 border rounded-md bg-gray-100" readonly>
         <div class="text-sm text-gray-600 text-center mt-1" id="progressText">(1 / 1)</div>
       </div>
 
-      
       <div id="employeeSlides" class="hidden">
         <div class="swiper">
           <div class="swiper-wrapper" id="slidesWrapper"></div>
-          
           <div class="swiper-button-prev"></div>
           <div class="swiper-button-next"></div>
           <div class="swiper-pagination"></div>
-        </div>
-        
-        <div class="text-center mt-4">
-          <button id="submitAllBtn" type="button" class="bg-blue-600 text-white px-6 py-2 rounded hidden">
-            Submit All
-          </button>
         </div>
       </div>
     </form>
@@ -107,18 +115,20 @@
 
   <div id="successModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
     <div class="bg-white p-6 rounded-lg shadow-lg text-center" id="successContent">
-      <h3 class="text-lg font-bold mb-2">Semua data berhasil dikirim !</h3>
-      <p class="text-gray-600">Terimakasih atas kerjasamanya :D
+      <h3 class="text-lg font-bold mb-2">Data berhasil dikirim!</h3>
+      <p class="text-gray-600">Terimakasih atas kerjasamanya :D</p>
     </div>
   </div>
 
+   <button id="fixedSubmitBtn">Submit All</button>
+
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzss7bXJe7cq1spOzikJyNTdDwKIIhJKuW-v46ebldnt87xPmXqlcMxqnltCDIN0OfxTw/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbxXt1Yrm2cnfJ_JbFM8rlDA8vWR2lSMksXnitV04dC-co7Mct9jrkhgv51pWF6wx8ex/exec";
     let formData = {};
     let employees = [];
     let swiper;
 
-    const QUESTIONS = [
+    const me18e = [
 		"Disiplin dalam melakukan pekerjaan sesuai instruksi kerja yang ada",
 		"Trampil dalam mengerjakan tugas",
 		"Sigap dalam menjalankan pekerjaan saya",
@@ -130,14 +140,16 @@
     ];
 
     function loadData(data) {
-      formData = data;
-      const mgrSel = document.getElementById("manager");
-      mgrSel.innerHTML = "<option value=''>Pilih Penilai</option>";
-      Object.keys(data).forEach(m => {
-        mgrSel.innerHTML += `<option value="${m}">${m}</option>`;
-      });
-      mgrSel.disabled = false;
-    }
+	  formData = data;
+	  const mgrSel = document.getElementById("manager");
+	  mgrSel.innerHTML = "<option value=''>Pilih Penilai</option>";
+	  const managers = Object.keys(data).sort((a, b) => a.localeCompare(b, 'id', { sensitivity: 'base' }));
+	  managers.forEach(m => {
+		mgrSel.innerHTML += `<option value="${m}">${m}</option>`;
+	  });
+
+	  mgrSel.disabled = false;
+	}
 
     function getDataJSONP() {
       const script = document.createElement("script");
@@ -145,130 +157,172 @@
       document.body.appendChild(script);
     }
 
-    document.getElementById("manager").addEventListener("change", function() {
+    document.getElementById("manager").addEventListener("change", async function() {
       const mgr = this.value;
-      const deptSel = document.getElementById("department");
-      deptSel.innerHTML = "<option value=''>Pilih Departemen</option>";
-      deptSel.disabled = true;
+      const deptInput = document.getElementById("department");
+      deptInput.value = "";
       document.getElementById("employeeSlides").classList.add("hidden");
       document.getElementById("employeeNameContainer").classList.add("hidden");
+      document.getElementById("loadingMsg").classList.remove("hidden");
 
       if (mgr && formData[mgr]) {
         const depts = Object.keys(formData[mgr]);
         if (depts.length > 0) {
           const firstDept = depts[0];
-          deptSel.innerHTML = `<option value="${firstDept}">${firstDept}</option>`;
-          deptSel.value = firstDept;
-          deptSel.disabled = true;
-
+          deptInput.value = firstDept;
           employees = formData[mgr][firstDept];
-          generateSlides(employees);
+
+          const periode = document.querySelector("select[name='periode']").value;
+          let doneList = [];
+          try {
+            const statusUrl = API_URL + `?action=status&period=${encodeURIComponent(periode)}&manager=${encodeURIComponent(mgr)}&department=${encodeURIComponent(firstDept)}`;
+            const res = await fetch(statusUrl);
+            const data = await res.json();
+            doneList = data.done || [];
+          } catch (err) {
+            console.error("Gagal cek status", err);
+          }
+
+          generateSlides(employees, doneList);
         }
       }
+      document.getElementById("loadingMsg").classList.add("hidden");
     });
 
     function updateEmployeeDisplay(idx) {
       document.getElementById("employeeNameBox").value = employees[idx] || "";
       document.getElementById("progressText").innerText = `(${idx+1} / ${employees.length})`;
-
-      const submitBtn = document.getElementById('submitAllBtn');
-      if (idx === employees.length - 1) submitBtn.classList.remove('hidden'); else submitBtn.classList.add('hidden');
     }
 
-    function generateSlides(employees) {
+    function generateSlides(employees, doneList=[]) {
       const wrapper = document.getElementById("slidesWrapper");
       wrapper.innerHTML = "";
 
       employees.forEach((emp, idx) => {
+        const isDone = doneList.includes(emp);
         wrapper.innerHTML += `
           <div class="swiper-slide p-4">
+            <div class="flex items-center mb-2">
+              <p class="font-semibold flex-1">${emp}</p>
+              ${isDone ? '<span class="text-green-600 font-bold ml-2">✔</span>' : ''}
+            </div>
             <p class="font-semibold mb-2 underline">Materi Evaluasi :</p>
-            ${QUESTIONS.map((text, qIdx) => `
+            ${me18e.map((text, qIdx) => `
               <div class="mb-3">
                 <label class="block text-sm mb-1">${qIdx+1}. ${text}</label>
                 <div class="rating-oval">
                   ${[1,2,3,4,5].map(v => `
-                    <label>
-                      <input type="radio" name="me${qIdx+1}_${idx}" value="${v}" required>
-                      <span>${v}</span>
-                    </label>`).join(" ")}
+                    <label><input type="radio" name="me${qIdx+1}_${idx}" value="${v}">
+                    <span>${v}</span></label>`).join(" ")}
                 </div>
-              </div>
-            `).join(" ")}
-      		<p class="font-semibold mb-2 underline">Evaluasi Karyawan :</p>
-            <textarea name="eval_${idx}" rows="3" class="w-full border p-2 mt-2" placeholder="Hal-hal yang perlu diperbaiki terkait tampilan kinerja karyawan . . ."></textarea>
+              </div>`).join(" ")}
+            <p class="font-semibold mb-2 underline">Evaluasi Karyawan :</p>
+            <textarea name="eval_${idx}" rows="3" class="w-full border p-2 mt-2"></textarea>
           </div>
         `;
       });
 
       document.getElementById("employeeSlides").classList.remove("hidden");
       document.getElementById("employeeNameContainer").classList.remove("hidden");
-
       updateEmployeeDisplay(0);
 
       if (swiper) swiper.destroy();
       swiper = new Swiper(".swiper", {
         navigation: { nextEl: ".swiper-button-next", prevEl: ".swiper-button-prev" },
         pagination: { el: ".swiper-pagination", clickable: true },
-        on: {
-          slideChange: function() {
-            updateEmployeeDisplay(this.activeIndex);
-          }
-        }
+        on: { slideChange: function() { updateEmployeeDisplay(this.activeIndex); } }
       });
+
+      document.getElementById("fixedSubmitBtn").style.display = "block";
     }
 
-    document.getElementById("submitAllBtn").addEventListener("click", async (e) => {
-      const btn = e.target;
-      btn.innerText = "Loading . . .";
-      btn.disabled = true;
+    async function handleSubmitAll(btn) {
+	  btn.innerText = "Loading...";
+	  btn.disabled = true;
 
-      const periode = document.querySelector("select[name='periode']").value;
-      const manager = document.getElementById("manager").value;
-      const department = document.getElementById("department").value;
+	  const periode = document.querySelector("select[name='periode']").value;
+	  const manager = document.getElementById("manager").value;
+	  const department = document.getElementById("department").value;
 
-      const payload = employees.map((emp, idx) => {
-        let answers = {};
-        for (let q=1; q<=QUESTIONS.length; q++) {
-          answers[`me${q}`] = document.querySelector(`input[name='me${q}_${idx}']:checked`)?.value || "";
-        }
-        return {
-          periode, manager, department, employee: emp,
-          ...answers,
-          eval: document.querySelector(`textarea[name='eval_${idx}']`).value
-        };
-      });
+	  let completeData = [];
+	  let incomplete = [];
 
-      try {
-        await fetch(API_URL, {
-          method: "POST",
-          body: JSON.stringify(payload),
-          headers: { "Content-Type": "application/json" },
-          mode: "no-cors"
-        });
 
-        setTimeout(() => {
-          document.getElementById("successModal").classList.remove("hidden");
-          document.getElementById("evaluationForm").reset();
-          if (employees.length > 0) {
-            updateEmployeeDisplay(0);
-            swiper.slideTo(0);
-          }
-          btn.innerText = "Submit All";
-          btn.disabled = false;
-        }, 500);
+	  let doneList = [];
+	  try {
+		const statusUrl = API_URL + `?action=status&period=${encodeURIComponent(periode)}&manager=${encodeURIComponent(manager)}&department=${encodeURIComponent(department)}`;
+		const res = await fetch(statusUrl);
+		const data = await res.json();
+		doneList = data.done || [];
+	  } catch (err) {
+		console.error("Gagal ambil status", err);
+	  }
 
-      } catch (e) {
-        alert("Gagal kirim: " + e.message);
-        btn.innerText = "Submit All";
-        btn.disabled = false;
-      }
-    });
+	  employees.forEach((emp, idx) => {
+		if (doneList.includes(emp)) return;
 
+		let answers = {};
+		let isComplete = true;
+
+		for (let q=1; q<=me18e.length; q++) {
+		  const val = document.querySelector(`input[name='me${q}_${idx}']:checked`)?.value || "";
+		  if (!val) isComplete = false;
+		  answers[`me${q}`] = val;
+		}
+		const evalText = document.querySelector(`textarea[name='eval_${idx}']`).value;
+		if (!evalText) isComplete = false;
+		if (!periode) isComplete = false;
+
+		if (isComplete) {
+		  completeData.push({ periode, manager, department, employee: emp, ...answers, eval: evalText });
+		} else {
+		  incomplete.push(emp);
+		}
+	  });
+
+	  if (completeData.length > 0) {
+		try {
+		  await fetch(API_URL, {
+			method: "POST",
+			body: JSON.stringify(completeData),
+			headers: { "Content-Type": "application/json" },
+			mode: "no-cors"
+		  });
+		} catch (e) {
+		  alert("Gagal kirim: " + e.message);
+		}
+	  }
+
+	  setTimeout(() => {
+		const modal = document.getElementById("successModal");
+		const content = document.getElementById("successContent");
+
+		content.innerHTML = `
+		  <h3 class="text-lg font-bold mb-2">Data berhasil dikirim!</h3>
+		  <p class="text-gray-600">Terimakasih atas kerjasamanya :D</p>
+		`;
+
+		if (incomplete.length > 0) {
+		  content.innerHTML += `
+			<div class="mt-4 text-left">
+			  <p class="text-blue-600 font-semibold underline">Cek, berikut adalah data yg belum lengkap:</p>
+			  <ul class="list-disc list-inside text-black-500">
+				${incomplete.map(n => `<li>${n}</li>`).join("")}
+			  </ul>
+			</div>
+		  `;
+		}
+
+		modal.classList.remove("hidden");
+		btn.innerText = "Submit All";
+		btn.disabled = false;
+	  }, 500);
+	}
+
+
+    document.getElementById("fixedSubmitBtn").onclick = () => handleSubmitAll(document.getElementById("fixedSubmitBtn"));
     document.getElementById("successModal").addEventListener("click", function(e) {
-      if (e.target === this) {
-        this.classList.add("hidden");
-      }
+      if (e.target === this) this.classList.add("hidden");
     });
 
     window.onload = getDataJSONP;
