@@ -172,6 +172,10 @@
           deptInput.value = firstDept;
           employees = formData[mgr][firstDept];
 
+			if (employees && Array.isArray(employees)) {
+             employees.sort((a, b) => a.localeCompare(b, 'id', { sensitivity: 'base' }));
+          }
+			
           const periode = document.querySelector("select[name='periode']").value;
           let doneList = [];
           try {
