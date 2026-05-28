@@ -70,6 +70,13 @@
     <h2 class="text-2xl font-bold mb-4 text-center">Form Evaluasi Kinerja</h2>
 
     <form id="evaluationForm" class="space-y-4">
+		<div>
+        <label class="block font-semibold text-gray-700">Tahun Penilaian</label>
+        <input type="text" id="tahunOtomatis" name="tahun_penilaian" 
+               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 cursor-default"
+               readonly value="">
+      </div>
+		
       <div>
         <label class="block font-semibold">Masa Penilaian</label>
         <select name="periode" class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm" required>
@@ -139,7 +146,15 @@
 		"Memahami bahwa bekerja adalah juga ibadah"
     ];
 
-    function loadData(data) {
+	  function setCurrentYear() {
+      const yearInput = document.getElementById("tahunOtomatis");
+      if (yearInput) {
+        const currentYear = new Date().getFullYear();
+        yearInput.value = currentYear;
+      }
+    }
+
+	  function loadData(data) {
 	  formData = data;
 	  const mgrSel = document.getElementById("manager");
 	  mgrSel.innerHTML = "<option value=''>Pilih Penilai</option>";
@@ -329,6 +344,8 @@
       if (e.target === this) this.classList.add("hidden");
     });
 
+	  setCurrentYear();
+	  
     window.onload = getDataJSONP;
   </script>
 </body>
